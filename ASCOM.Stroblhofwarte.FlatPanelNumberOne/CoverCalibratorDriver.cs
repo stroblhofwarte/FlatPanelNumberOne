@@ -105,6 +105,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         internal TraceLogger tl;
 
         private object _lock = new object();
+        private bool _lightState = false;
         /// <summary>
         /// Initializes a new instance of the <see cref="Stroblhof.FlatPanelNumberOne"/> class.
         /// Must be public for COM registration.
@@ -387,6 +388,8 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
+                if(!_lightState)
+                    return CalibratorStatus.Off;
                 return CalibratorStatus.Ready;
             }
         }
@@ -398,8 +401,12 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                tl.LogMessage("Brightness Get", "Not implemented");
-                throw new ASCOM.PropertyNotImplementedException("Brightness", false);
+                _serial.Transmit("RB:");
+                string ret = _serial.ReceiveTerminated("#");
+                ret = ret.Replace('#', ' ');
+                ret = ret.Trim();
+                float val = (float)Convert.ToDouble(ret, CultureInfo.InvariantCulture);
+                return (int)val;
             }
         }
 
@@ -410,8 +417,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                tl.LogMessage("MaxBrightness Get", "Not implemented");
-                throw new ASCOM.PropertyNotImplementedException("MaxBrightness", false);
+                return 255;
             }
         }
 
@@ -420,9 +426,15 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         /// <param name="Brightness"></param>
         public void CalibratorOn(int Brightness)
-        {
-            tl.LogMessage("CalibratorOn", $"Not implemented. Value set: {Brightness}");
-            throw new ASCOM.MethodNotImplementedException("CalibratorOn");
+        { 
+            _serial.Transmit("BR" + Brightness + ":");
+            string ret = _serial.ReceiveTerminated("#");
+            _serial.Transmit("ON:");
+            ret = _serial.ReceiveTerminated("#");
+            if(ret == "1#")
+            {
+                _lightState = true;
+            }
         }
 
         /// <summary>
@@ -430,8 +442,12 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         public void CalibratorOff()
         {
-            tl.LogMessage("CalibratorOff", "Not implemented");
-            throw new ASCOM.MethodNotImplementedException("CalibratorOff");
+            _serial.Transmit("OF:");
+            string ret = _serial.ReceiveTerminated("#");
+            if (ret == "1#")
+            {
+                _lightState = false;
+            }
         }
 
         #endregion
