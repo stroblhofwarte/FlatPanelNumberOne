@@ -1,23 +1,33 @@
 //tabs=4
 // --------------------------------------------------------------------------------
-// TODO fill in this information for your driver, then remove this line!
+// This file is part of the Stroblhofwarte.FlatPanelNumberOne project 
+// (https://github.com/stroblhofwarte/FlatPanelNumberOne.git).
+// Copyright (c) 2022, Othmar Ehrhardt, https://astro.stroblhof-oberrohrbach.de
 //
+// This program is free software: you can redistribute it and/or modify  
+// it under the terms of the GNU General Public License as published by  
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but 
+// WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+// General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License 
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
 // ASCOM CoverCalibrator driver for Stroblhof.FlatPanelNumberOne
 //
-// Description:	Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam 
-//				nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam 
-//				erat, sed diam voluptua. At vero eos et accusam et justo duo 
-//				dolores et ea rebum. Stet clita kasd gubergren, no sea takimata 
-//				sanctus est Lorem ipsum dolor sit amet.
-//
-// Implements:	ASCOM CoverCalibrator interface version: <To be completed by driver developer>
-// Author:		(XXX) Your N. Here <your@email.here>
+// Description:	This driver is related to the arduino firmware in this repo
+//              to drive a simple 20 EUR drawing pad via a Motor Shield to
+//              do an automatic flat frame creation for your astronomical
+//              imagin session.
+// Implements:	ASCOM CoverCalibrator interface version: 6.6
 //
 // Edit Log:
 //
 // Date			Who	Vers	Description
 // -----------	---	-----	-------------------------------------------------------
-// dd-mmm-yyyy	XXX	6.0.0	Initial edit, created from ASCOM driver template
+// 15-05-2022	Othmar Ehrhardt	0.0.1	Initial edit, created from ASCOM driver template
 // --------------------------------------------------------------------------------
 //
 
@@ -42,16 +52,13 @@ using System.Text;
 namespace ASCOM.Stroblhof.FlatPanelNumberOne
 {
     //
-    // Your driver's DeviceID is ASCOM.Stroblhof.FlatPanelNumberOne.CoverCalibrator
+    // DeviceID is ASCOM.Stroblhof.FlatPanelNumberOne.CoverCalibrator
     //
     // The Guid attribute sets the CLSID for ASCOM.Stroblhof.FlatPanelNumberOne.CoverCalibrator
     // The ClassInterface/None attribute prevents an empty interface called
     // _Stroblhof.FlatPanelNumberOne from being created and used as the [default] interface
     //
-    // TODO Replace the not implemented exceptions with code to implement the function or
-    // throw the appropriate ASCOM exception.
-    //
-
+   
     /// <summary>
     /// ASCOM CoverCalibrator Driver for Stroblhof.FlatPanelNumberOne.
     /// </summary>
@@ -76,7 +83,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         internal static string traceStateDefault = "false";
 
         internal static string comPort; // Variables to hold the current device configuration
-
+        private ASCOM.Utilities.Serial _serial;
         /// <summary>
         /// Private variable to hold the connected state
         /// </summary>
@@ -97,6 +104,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         internal TraceLogger tl;
 
+        private object _lock = new object();
         /// <summary>
         /// Initializes a new instance of the <see cref="Stroblhof.FlatPanelNumberOne"/> class.
         /// Must be public for COM registration.
@@ -164,32 +172,21 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         public void CommandBlind(string command, bool raw)
         {
             CheckConnected("CommandBlind");
-            // TODO The optional CommandBlind method should either be implemented OR throw a MethodNotImplementedException
-            // If implemented, CommandBlind must send the supplied command to the mount and return immediately without waiting for a response
-
-            throw new ASCOM.MethodNotImplementedException("CommandBlind");
+            this.CommandString(command, raw);
         }
 
         public bool CommandBool(string command, bool raw)
         {
             CheckConnected("CommandBool");
-            // TODO The optional CommandBool method should either be implemented OR throw a MethodNotImplementedException
-            // If implemented, CommandBool must send the supplied command to the mount, wait for a response and parse this to return a True or False value
-
-            // string retString = CommandString(command, raw); // Send the command and wait for the response
-            // bool retBool = XXXXXXXXXXXXX; // Parse the returned string and create a boolean True / False value
-            // return retBool; // Return the boolean value to the client
-
-            throw new ASCOM.MethodNotImplementedException("CommandBool");
+            string ret = CommandString(command, raw);
+            return true;
         }
 
         public string CommandString(string command, bool raw)
         {
             CheckConnected("CommandString");
-            // TODO The optional CommandString method should either be implemented OR throw a MethodNotImplementedException
-            // If implemented, CommandString must send the supplied command to the mount and wait for a response before returning this to the client
-
-            throw new ASCOM.MethodNotImplementedException("CommandString");
+            string ret = CommandString(command, raw);
+            return ret;
         }
 
         public void Dispose()
@@ -204,6 +201,42 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             astroUtilities = null;
         }
 
+        private bool CheckForFlatDevice()
+        {
+            lock (_lock)
+            {
+                string idString = String.Empty;
+                int retry = 3;
+                while (idString != "FLATONE#")
+                {
+                    try
+                    {
+                        _serial.Transmit("ID:");
+                        idString = _serial.ReceiveTerminated("#");
+                    }
+                    catch (Exception ex)
+                    {
+                        retry--;
+                        if (retry == 0) return false;
+                        continue;
+                    }
+                }
+                return true;
+            }
+        }
+
+        private string GetInfoString()
+        {
+            if (!connectedState) return "Not connected.";
+            lock (_lock)
+            {
+                _serial.Transmit("IF:");
+                string ret = _serial.ReceiveTerminated("#");
+                ret = ret.Replace('#', ' ');
+                ret = ret.Trim();
+                return ret;
+            }
+        }
         public bool Connected
         {
             get
@@ -216,25 +249,49 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                 tl.LogMessage("Connected", "Set {0}", value);
                 if (value == IsConnected)
                     return;
-
                 if (value)
                 {
-                    connectedState = true;
-                    LogMessage("Connected Set", "Connecting to port {0}", comPort);
-                    // TODO connect to the device
+                    LogMessage("Connected Set", "Connecting to address {0}", comPort);
+                    try
+                    {
+                        LogMessage("Connected Set", "Connecting to port {0}", comPort);
+                        lock (_lock)
+                        {
+                            _serial = new ASCOM.Utilities.Serial();
+                            _serial.PortName = comPort;
+                            _serial.StopBits = SerialStopBits.One;
+                            _serial.Parity = SerialParity.None;
+                            _serial.Speed = SerialSpeed.ps9600;
+                            _serial.DTREnable = false;
+                            _serial.Connected = true;
+                            if (CheckForFlatDevice())
+                            {
+                                connectedState = true;
+                            }
+                            else
+                                connectedState = false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _serial.Connected = false;
+                        _serial.Dispose();
+                        LogMessage("Connected Set", ex.ToString());
+                    }
                 }
                 else
                 {
                     connectedState = false;
-                    LogMessage("Connected Set", "Disconnecting from port {0}", comPort);
-                    // TODO disconnect from the device
+                    _serial.Connected = false;
+                    _serial.Dispose();
+                    LogMessage("Connected Set", "Disconnecting from adress {0}", comPort);
                 }
+
             }
         }
 
         public string Description
         {
-            // TODO customise this device description
             get
             {
                 tl.LogMessage("Description Get", driverDescription);
@@ -247,8 +304,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             get
             {
                 Version version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                // TODO customise this driver description
-                string driverInfo = "Information about the driver itself. Version: " + String.Format(CultureInfo.InvariantCulture, "{0}.{1}", version.Major, version.Minor);
+                string driverInfo = "Stroblhowarte FlatPanel: " + GetInfoString();
                 tl.LogMessage("DriverInfo Get", driverInfo);
                 return driverInfo;
             }
@@ -279,7 +335,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                string name = "Short driver name - please customise";
+                string name = "Stroblhofwarte.FlatPanelNumberOne";
                 tl.LogMessage("Name Get", name);
                 return name;
             }
@@ -296,8 +352,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                tl.LogMessage("CoverState Get", "Not implemented");
-                throw new ASCOM.PropertyNotImplementedException("CoverState", false);
+                return CoverStatus.NotPresent;
             }
         }
 
@@ -306,8 +361,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         public void OpenCover()
         {
-            tl.LogMessage("OpenCover", "Not implemented");
-            throw new ASCOM.MethodNotImplementedException("OpenCover");
+            return;
         }
 
         /// <summary>
@@ -315,8 +369,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         public void CloseCover()
         {
-            tl.LogMessage("CloseCover", "Not implemented");
-            throw new ASCOM.MethodNotImplementedException("CloseCover");
+            return;
         }
 
         /// <summary>
@@ -324,8 +377,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         public void HaltCover()
         {
-            tl.LogMessage("HaltCover", "Not implemented");
-            throw new ASCOM.MethodNotImplementedException("HaltCover");
+            return;
         }
 
         /// <summary>
@@ -335,8 +387,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                tl.LogMessage("CalibratorState Get", "Not implemented");
-                throw new ASCOM.PropertyNotImplementedException("CalibratorState", false);
+                return CalibratorStatus.Ready;
             }
         }
 
