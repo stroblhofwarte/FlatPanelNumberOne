@@ -46,8 +46,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace ASCOM.Stroblhof.FlatPanelNumberOne
 {
@@ -77,12 +79,25 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         private static string driverDescription = "ASCOM CoverCalibrator Driver for Stroblhof.FlatPanelNumberOne.";
 
-        internal static string comPortProfileName = "COM Port"; // Constants used for Profile persistence
-        internal static string comPortDefault = "COM1";
+        internal static string mqttHostProfileName = "MQTTBroker"; // Constants used for Profile persistence
+        internal static string mqttHostDefault = "192.168.0.1";
+        internal static string mqttTopicProfileName = "MQTTTopic"; // Constants used for Profile persistence
+        internal static string mqttTopicDefault = "my/relay/topic";
+        internal static string mqttOnProfileName = "MQTTOnMsg"; // Constants used for Profile persistence
+        internal static string mqttOnDefault = "on";
+        internal static string mqttOffProfileName = "MQTTOffMsg"; // Constants used for Profile persistence
+        internal static string mqttOffDefault = "off";
+
         internal static string traceStateProfileName = "Trace Level";
         internal static string traceStateDefault = "false";
 
-        internal static string comPort; // Variables to hold the current device configuration
+        internal static string mqttHost;
+        internal static string mqttTopic;
+        internal static string mqttOnMsg;
+        internal static string mqttOffMsg;
+
+        private bool _calibratorOn = false;
+        
         private ASCOM.Utilities.Serial _serial;
         /// <summary>
         /// Private variable to hold the connected state
@@ -105,7 +120,9 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         internal TraceLogger tl;
 
         private object _lock = new object();
-        private bool _lightState = false;
+        private uPLibrary.Networking.M2Mqtt.MqttClient _mqttClient = null;
+        private string _mqttClientId = "Stroblhof.FlatPanelNumberOne";
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Stroblhof.FlatPanelNumberOne"/> class.
         /// Must be public for COM registration.
@@ -202,40 +219,13 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             astroUtilities = null;
         }
 
-        private bool CheckForFlatDevice()
-        {
-            lock (_lock)
-            {
-                string idString = String.Empty;
-                int retry = 3;
-                while (idString != "FLATONE#")
-                {
-                    try
-                    {
-                        _serial.Transmit("ID:");
-                        idString = _serial.ReceiveTerminated("#");
-                    }
-                    catch (Exception ex)
-                    {
-                        retry--;
-                        if (retry == 0) return false;
-                        continue;
-                    }
-                }
-                return true;
-            }
-        }
 
         private string GetInfoString()
         {
             if (!connectedState) return "Not connected.";
             lock (_lock)
             {
-                _serial.Transmit("IF:");
-                string ret = _serial.ReceiveTerminated("#");
-                ret = ret.Replace('#', ' ');
-                ret = ret.Trim();
-                return ret;
+                return "Connected to:" + mqttHost + ":1883";
             }
         }
         public bool Connected
@@ -252,40 +242,25 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                     return;
                 if (value)
                 {
-                    LogMessage("Connected Set", "Connecting to address {0}", comPort);
+                    LogMessage("Connected Set", "Connecting to address {0}", mqttHost);
                     try
                     {
-                        LogMessage("Connected Set", "Connecting to port {0}", comPort);
-                        lock (_lock)
-                        {
-                            _serial = new ASCOM.Utilities.Serial();
-                            _serial.PortName = comPort;
-                            _serial.StopBits = SerialStopBits.One;
-                            _serial.Parity = SerialParity.None;
-                            _serial.Speed = SerialSpeed.ps9600;
-                            _serial.DTREnable = false;
-                            _serial.Connected = true;
-                            if (CheckForFlatDevice())
-                            {
-                                connectedState = true;
-                            }
-                            else
-                                connectedState = false;
-                        }
+                        _mqttClient = new uPLibrary.Networking.M2Mqtt.MqttClient(IPAddress.Parse(mqttHost));
+                        _mqttClient.Connect(_mqttClientId);
+                        connectedState = _mqttClient.IsConnected;
                     }
                     catch (Exception ex)
                     {
-                        _serial.Connected = false;
-                        _serial.Dispose();
+                        _mqttClient = null;
+                        connectedState = false;
                         LogMessage("Connected Set", ex.ToString());
                     }
                 }
                 else
                 {
+                    _mqttClient = null;
                     connectedState = false;
-                    _serial.Connected = false;
-                    _serial.Dispose();
-                    LogMessage("Connected Set", "Disconnecting from adress {0}", comPort);
+                    LogMessage("Connected Set", "Disconnecting from adress {0}", mqttHost);
                 }
 
             }
@@ -388,7 +363,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                if(!_lightState)
+                if(!_calibratorOn)
                     return CalibratorStatus.Off;
                 return CalibratorStatus.Ready;
             }
@@ -401,12 +376,9 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                _serial.Transmit("RB:");
-                string ret = _serial.ReceiveTerminated("#");
-                ret = ret.Replace('#', ' ');
-                ret = ret.Trim();
-                float val = (float)Convert.ToDouble(ret, CultureInfo.InvariantCulture);
-                return (int)val;
+                if (_calibratorOn)
+                    return 1;
+                return 0;
             }
         }
 
@@ -417,7 +389,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             get
             {
-                return 255;
+                return 1;
             }
         }
 
@@ -426,14 +398,16 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         /// <param name="Brightness"></param>
         public void CalibratorOn(int Brightness)
-        { 
-            _serial.Transmit("BR" + Brightness + ":");
-            string ret = _serial.ReceiveTerminated("#");
-            _serial.Transmit("ON:");
-            ret = _serial.ReceiveTerminated("#");
-            if(ret == "1#")
+        {
+            if (Brightness > 0)
             {
-                _lightState = true;
+                _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOnMsg));
+                _calibratorOn = true;
+            }
+            else
+            {
+                _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOffMsg));
+                _calibratorOn = false;
             }
         }
 
@@ -442,12 +416,9 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         /// </summary>
         public void CalibratorOff()
         {
-            _serial.Transmit("OF:");
-            string ret = _serial.ReceiveTerminated("#");
-            if (ret == "1#")
-            {
-                _lightState = false;
-            }
+            _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOffMsg));
+            _calibratorOn = false;
+            
         }
 
         #endregion
@@ -563,7 +534,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             {
                 driverProfile.DeviceType = "CoverCalibrator";
                 tl.Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, traceStateProfileName, string.Empty, traceStateDefault));
-                comPort = driverProfile.GetValue(driverID, comPortProfileName, string.Empty, comPortDefault);
+                mqttHost = driverProfile.GetValue(driverID, mqttHostProfileName, string.Empty, mqttHostDefault);
+                mqttTopic = driverProfile.GetValue(driverID, mqttTopicProfileName, string.Empty, mqttTopicDefault);
+                mqttOnMsg = driverProfile.GetValue(driverID, mqttOnProfileName, string.Empty, mqttOnDefault);
+                mqttOffMsg = driverProfile.GetValue(driverID, mqttOffProfileName, string.Empty, mqttOffDefault);
             }
         }
 
@@ -576,21 +550,25 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             {
                 driverProfile.DeviceType = "CoverCalibrator";
                 driverProfile.WriteValue(driverID, traceStateProfileName, tl.Enabled.ToString());
-                driverProfile.WriteValue(driverID, comPortProfileName, comPort.ToString());
+                driverProfile.WriteValue(driverID, mqttHostProfileName, mqttHost);
+                driverProfile.WriteValue(driverID, mqttTopicProfileName, mqttTopic);
+                driverProfile.WriteValue(driverID, mqttOnProfileName, mqttOnMsg);
+                driverProfile.WriteValue(driverID, mqttOffProfileName, mqttOffMsg);
             }
-        }
+    }
 
-        /// <summary>
-        /// Log helper function that takes formatted strings and arguments
-        /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="message"></param>
-        /// <param name="args"></param>
-        internal void LogMessage(string identifier, string message, params object[] args)
-        {
-            var msg = string.Format(message, args);
-            tl.LogMessage(identifier, msg);
-        }
-        #endregion
+
+    /// <summary>
+    /// Log helper function that takes formatted strings and arguments
+    /// </summary>
+    /// <param name="identifier"></param>
+    /// <param name="message"></param>
+    /// <param name="args"></param>
+    internal void LogMessage(string identifier, string message, params object[] args)
+    {
+        var msg = string.Format(message, args);
+        tl.LogMessage(identifier, msg);
+    }
+    #endregion
     }
 }

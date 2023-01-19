@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -30,7 +31,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             // Place any validation constraint checks here
             // Update the state variables with results from the dialogue
-            CoverCalibrator.comPort = (string)comboBoxComPort.SelectedItem;
+            CoverCalibrator.mqttHost = textBoxHost.Text;
+            CoverCalibrator.mqttTopic = textBoxTopic.Text;
+            CoverCalibrator.mqttOnMsg = textBoxOn.Text;
+            CoverCalibrator.mqttOffMsg = textBoxOff.Text;
             tl.Enabled = chkTrace.Checked;
         }
 
@@ -60,12 +64,39 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         {
             chkTrace.Checked = tl.Enabled;
             // set the list of com ports to those that are currently available
-            comboBoxComPort.Items.Clear();
-            comboBoxComPort.Items.AddRange(System.IO.Ports.SerialPort.GetPortNames());      // use System.IO because it's static
-            // select the current port if possible
-            if (comboBoxComPort.Items.Contains(CoverCalibrator.comPort))
+            textBoxHost.Text = CoverCalibrator.mqttHost;
+            textBoxTopic.Text = CoverCalibrator.mqttTopic;
+            textBoxOn.Text = CoverCalibrator.mqttOnMsg;
+            textBoxOff.Text = CoverCalibrator.mqttOffMsg;
+        }
+
+        private void buttonTestOn_Click(object sender, EventArgs e)
+        {
+            uPLibrary.Networking.M2Mqtt.MqttClient testClient = new uPLibrary.Networking.M2Mqtt.MqttClient(IPAddress.Parse(textBoxHost.Text));
+            testClient.Connect("FlatPanelTest");
+            if(testClient.IsConnected)
             {
-                comboBoxComPort.SelectedItem = CoverCalibrator.comPort;
+                labelInfo.Text = "Connected to " + textBoxHost.Text;
+                testClient.Publish(textBoxTopic.Text, Encoding.UTF8.GetBytes(textBoxOn.Text));
+            }
+            else
+            {
+                labelInfo.Text = "Can not connect to " + textBoxHost.Text;
+            }
+        }
+
+        private void buttonTestOff_Click(object sender, EventArgs e)
+        {
+            uPLibrary.Networking.M2Mqtt.MqttClient testClient = new uPLibrary.Networking.M2Mqtt.MqttClient(IPAddress.Parse(textBoxHost.Text));
+            testClient.Connect("FlatPanelTest");
+            if (testClient.IsConnected)
+            {
+                labelInfo.Text = "Connected to " + textBoxHost.Text;
+                testClient.Publish(textBoxTopic.Text, Encoding.UTF8.GetBytes(textBoxOff.Text));
+            }
+            else
+            {
+                labelInfo.Text = "Can not connect to " + textBoxHost.Text;
             }
         }
     }
