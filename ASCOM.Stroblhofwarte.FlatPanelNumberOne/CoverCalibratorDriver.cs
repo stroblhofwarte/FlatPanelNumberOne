@@ -28,6 +28,7 @@
 // Date			Who	Vers	Description
 // -----------	---	-----	-------------------------------------------------------
 // 15-05-2022	Othmar Ehrhardt	0.0.1	Initial edit, created from ASCOM driver template
+// 19-01-2023   Othmar Ehrhardt 0.0.2   CHange to a MQTT based flat panel (or spot light)
 // --------------------------------------------------------------------------------
 //
 
@@ -50,6 +51,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using uPLibrary.Networking.M2Mqtt.Messages;
 
 namespace ASCOM.Stroblhof.FlatPanelNumberOne
 {
@@ -88,6 +90,13 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         internal static string mqttOffProfileName = "MQTTOffMsg"; // Constants used for Profile persistence
         internal static string mqttOffDefault = "off";
 
+        internal static string mqttSubscriptionProfileName = "MQTTSubscription"; // Constants used for Profile persistence
+        internal static string mqttSubscriptionDefault = "my/relay/state";
+        internal static string mqttSubOnProfileName = "MQTTOnSub"; // Constants used for Profile persistence
+        internal static string mqttSubOnDefault = "on";
+        internal static string mqttSubOffProfileName = "MQTTOffSub"; // Constants used for Profile persistence
+        internal static string mqttSubOffDefault = "off";
+
         internal static string traceStateProfileName = "Trace Level";
         internal static string traceStateDefault = "false";
 
@@ -95,6 +104,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         internal static string mqttTopic;
         internal static string mqttOnMsg;
         internal static string mqttOffMsg;
+
+        internal static string mqttSubscription;
+        internal static string mqttOnSub;
+        internal static string mqttOffSub;
 
         private bool _calibratorOn = false;
         
@@ -248,6 +261,13 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                         _mqttClient = new uPLibrary.Networking.M2Mqtt.MqttClient(IPAddress.Parse(mqttHost));
                         _mqttClient.Connect(_mqttClientId);
                         connectedState = _mqttClient.IsConnected;
+                        if(connectedState)
+                        {
+                            string[] subscriptions = new string[1];
+                            subscriptions[0] = mqttSubscription;
+                            _mqttClient.MqttMsgPublishReceived += _mqttClient_MqttMsgPublishReceived;
+                            _mqttClient.Subscribe(subscriptions, new byte[] { MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE });
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -264,6 +284,15 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                 }
 
             }
+        }
+
+        private void _mqttClient_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
+        {
+            string msg = Encoding.ASCII.GetString(e.Message);
+            if (msg == mqttOnSub)
+                _calibratorOn = true;
+            if (msg == mqttOffSub)
+                _calibratorOn = false;
         }
 
         public string Description
@@ -402,12 +431,11 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             if (Brightness > 0)
             {
                 _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOnMsg));
-                _calibratorOn = true;
+                // _calibratorOn will be set by the subscription
             }
             else
             {
                 _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOffMsg));
-                _calibratorOn = false;
             }
         }
 
@@ -417,8 +445,8 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         public void CalibratorOff()
         {
             _mqttClient.Publish(mqttTopic, Encoding.UTF8.GetBytes(mqttOffMsg));
-            _calibratorOn = false;
-            
+            // _calibratorOn will be set by the subscription
+
         }
 
         #endregion
@@ -538,6 +566,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                 mqttTopic = driverProfile.GetValue(driverID, mqttTopicProfileName, string.Empty, mqttTopicDefault);
                 mqttOnMsg = driverProfile.GetValue(driverID, mqttOnProfileName, string.Empty, mqttOnDefault);
                 mqttOffMsg = driverProfile.GetValue(driverID, mqttOffProfileName, string.Empty, mqttOffDefault);
+
+                mqttSubscription = driverProfile.GetValue(driverID, mqttSubscriptionProfileName, string.Empty, mqttSubscriptionDefault);
+                mqttOnSub = driverProfile.GetValue(driverID, mqttSubOnProfileName, string.Empty, mqttSubOnDefault);
+                mqttOffSub = driverProfile.GetValue(driverID, mqttSubOffProfileName, string.Empty, mqttSubOffDefault);
             }
         }
 
@@ -554,6 +586,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
                 driverProfile.WriteValue(driverID, mqttTopicProfileName, mqttTopic);
                 driverProfile.WriteValue(driverID, mqttOnProfileName, mqttOnMsg);
                 driverProfile.WriteValue(driverID, mqttOffProfileName, mqttOffMsg);
+
+                driverProfile.WriteValue(driverID, mqttSubscriptionProfileName, mqttSubscription);
+                driverProfile.WriteValue(driverID, mqttSubOnProfileName, mqttOnSub);
+                driverProfile.WriteValue(driverID, mqttSubOffProfileName, mqttOffSub);
             }
     }
 

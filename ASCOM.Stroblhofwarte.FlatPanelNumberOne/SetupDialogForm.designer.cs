@@ -44,6 +44,12 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             this.buttonTestOn = new System.Windows.Forms.Button();
             this.buttonTestOff = new System.Windows.Forms.Button();
             this.labelInfo = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
+            this.textBoxOffState = new System.Windows.Forms.TextBox();
+            this.textBoxOnState = new System.Windows.Forms.TextBox();
+            this.label7 = new System.Windows.Forms.Label();
+            this.textBoxSub = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.picASCOM)).BeginInit();
             this.SuspendLayout();
             // 
@@ -51,7 +57,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             // 
             this.cmdOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.cmdOK.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.cmdOK.Location = new System.Drawing.Point(480, 171);
+            this.cmdOK.Location = new System.Drawing.Point(480, 283);
             this.cmdOK.Name = "cmdOK";
             this.cmdOK.Size = new System.Drawing.Size(78, 24);
             this.cmdOK.TabIndex = 0;
@@ -63,7 +69,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             // 
             this.cmdCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.cmdCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cmdCancel.Location = new System.Drawing.Point(480, 201);
+            this.cmdCancel.Location = new System.Drawing.Point(480, 313);
             this.cmdCancel.Name = "cmdCancel";
             this.cmdCancel.Size = new System.Drawing.Size(78, 25);
             this.cmdCancel.TabIndex = 1;
@@ -88,7 +94,7 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             // chkTrace
             // 
             this.chkTrace.AutoSize = true;
-            this.chkTrace.Location = new System.Drawing.Point(405, 206);
+            this.chkTrace.Location = new System.Drawing.Point(395, 318);
             this.chkTrace.Name = "chkTrace";
             this.chkTrace.Size = new System.Drawing.Size(69, 17);
             this.chkTrace.TabIndex = 6;
@@ -182,17 +188,71 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             // labelInfo
             // 
             this.labelInfo.AutoSize = true;
-            this.labelInfo.Location = new System.Drawing.Point(12, 212);
+            this.labelInfo.Location = new System.Drawing.Point(12, 319);
             this.labelInfo.Name = "labelInfo";
             this.labelInfo.Size = new System.Drawing.Size(16, 13);
             this.labelInfo.TabIndex = 18;
             this.labelInfo.Text = "...";
             // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(281, 246);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(50, 13);
+            this.label5.TabIndex = 24;
+            this.label5.Text = "Off state:";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(281, 220);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(54, 13);
+            this.label6.TabIndex = 23;
+            this.label6.Text = "On Ssate:";
+            // 
+            // textBoxOffState
+            // 
+            this.textBoxOffState.Location = new System.Drawing.Point(362, 243);
+            this.textBoxOffState.Name = "textBoxOffState";
+            this.textBoxOffState.Size = new System.Drawing.Size(56, 20);
+            this.textBoxOffState.TabIndex = 22;
+            // 
+            // textBoxOnState
+            // 
+            this.textBoxOnState.Location = new System.Drawing.Point(362, 217);
+            this.textBoxOnState.Name = "textBoxOnState";
+            this.textBoxOnState.Size = new System.Drawing.Size(56, 20);
+            this.textBoxOnState.TabIndex = 21;
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(40, 194);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(94, 13);
+            this.label7.TabIndex = 20;
+            this.label7.Text = "State subscription:";
+            // 
+            // textBoxSub
+            // 
+            this.textBoxSub.Location = new System.Drawing.Point(134, 191);
+            this.textBoxSub.Name = "textBoxSub";
+            this.textBoxSub.Size = new System.Drawing.Size(284, 20);
+            this.textBoxSub.TabIndex = 19;
+            // 
             // SetupDialogForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(568, 234);
+            this.ClientSize = new System.Drawing.Size(568, 346);
+            this.Controls.Add(this.label5);
+            this.Controls.Add(this.label6);
+            this.Controls.Add(this.textBoxOffState);
+            this.Controls.Add(this.textBoxOnState);
+            this.Controls.Add(this.label7);
+            this.Controls.Add(this.textBoxSub);
             this.Controls.Add(this.labelInfo);
             this.Controls.Add(this.buttonTestOff);
             this.Controls.Add(this.buttonTestOn);
@@ -238,5 +298,11 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
         private System.Windows.Forms.Button buttonTestOn;
         private System.Windows.Forms.Button buttonTestOff;
         private System.Windows.Forms.Label labelInfo;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.TextBox textBoxOffState;
+        private System.Windows.Forms.TextBox textBoxOnState;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.TextBox textBoxSub;
     }
 }

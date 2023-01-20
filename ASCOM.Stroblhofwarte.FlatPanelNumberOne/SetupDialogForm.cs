@@ -35,6 +35,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             CoverCalibrator.mqttTopic = textBoxTopic.Text;
             CoverCalibrator.mqttOnMsg = textBoxOn.Text;
             CoverCalibrator.mqttOffMsg = textBoxOff.Text;
+
+            CoverCalibrator.mqttSubscription = textBoxSub.Text;
+            CoverCalibrator.mqttOnSub = textBoxOnState.Text;
+            CoverCalibrator.mqttOffSub = textBoxOffState.Text;
             tl.Enabled = chkTrace.Checked;
         }
 
@@ -68,6 +72,10 @@ namespace ASCOM.Stroblhof.FlatPanelNumberOne
             textBoxTopic.Text = CoverCalibrator.mqttTopic;
             textBoxOn.Text = CoverCalibrator.mqttOnMsg;
             textBoxOff.Text = CoverCalibrator.mqttOffMsg;
+
+            textBoxSub.Text = CoverCalibrator.mqttSubscription;
+            textBoxOnState.Text = CoverCalibrator.mqttOnSub;
+            textBoxOffState.Text = CoverCalibrator.mqttOffSub;
         }
 
         private void buttonTestOn_Click(object sender, EventArgs e)
